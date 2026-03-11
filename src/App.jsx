@@ -16,218 +16,173 @@ const LEVELS = ["Basic", "Intermediate", "Advanced"];
 const getAc = el => { for (const [k,v] of Object.entries(EC)) { if (el && el.includes(k.substring(0,5))) return v.ac; } return "#3b82f6"; };
 const getBd = el => { for (const [k,v] of Object.entries(EC)) { if (el && el.includes(k.substring(0,5))) return v.bd; } return "#334155"; };
 
+/* NAV ITEMS */
+const NAV = [
+  { k: "single", icon: "M4 6h16M4 12h16M4 18h16", label: "Matrix" },
+  { k: "compare", icon: "M9 5l7 7-7 7", label: "Compare" },
+  { k: "wizard", icon: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z", label: "Wizard" },
+  { k: "dict", icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253", label: "Dictionary" },
+];
+
+function NavIcon({ d, size = 20, color = "currentColor" }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d={d}/></svg>;
+}
+
+/* SHARED COMPONENTS */
 function Badge({children,color="#334155",title,outline,glow,onClick}){
-  return <span title={!onClick?title:undefined} onClick={onClick} style={{display:"inline-block",padding:"3px 10px",borderRadius:6,fontSize:"11.5px",fontWeight:500,backgroundColor:color,color:"#e2e8f0",margin:"2px 3px",lineHeight:1.4,border:outline?"1.5px solid "+outline:"1px solid rgba(255,255,255,0.06)",cursor:onClick?"pointer":title?"help":"default",maxWidth:"100%",wordBreak:"break-word",boxShadow:glow?"0 0 8px "+glow+"40":"none",transition:"all 0.15s"}}>{children}</span>;
+  return <span title={!onClick?title:undefined} onClick={onClick} style={{display:"inline-block",padding:"4px 12px",borderRadius:8,fontSize:12,fontWeight:500,backgroundColor:color,color:"#e2e8f0",margin:"2px 4px",lineHeight:1.4,border:outline?"1.5px solid "+outline:"1px solid rgba(255,255,255,0.06)",cursor:onClick?"pointer":title?"help":"default",maxWidth:"100%",wordBreak:"break-word",boxShadow:glow?"0 0 8px "+glow+"40":"none",transition:"all 0.15s"}}>{children}</span>;
 }
 
 function SH({icon,title,accent}){
-  return <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 16px",background:"linear-gradient(90deg, "+accent+"18 0%, transparent 100%)",borderLeft:"3px solid "+accent,marginBottom:2,borderRadius:"0 6px 6px 0"}}><span style={{fontSize:15}}>{icon}</span><span style={{fontSize:12,fontWeight:700,color:"#e2e8f0",textTransform:"uppercase",letterSpacing:"1.5px"}}>{title}</span></div>;
+  return <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",background:"linear-gradient(90deg, "+accent+"18 0%, transparent 100%)",borderLeft:"3px solid "+accent,marginBottom:2,borderRadius:"0 8px 8px 0"}}><span style={{fontSize:16}}>{icon}</span><span style={{fontSize:13,fontWeight:700,color:"#e2e8f0",textTransform:"uppercase",letterSpacing:"1.5px"}}>{title}</span></div>;
 }
 
 /* ========== POSITION CODING WIZARD ========== */
-function Wizard() {
+function Wizard({ onCompare }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [session, setSession] = useState([]);
   const [detail, setDetail] = useState(null);
-  const [searchMode, setSearchMode] = useState("both");
   const [scopeFilter, setScopeFilter] = useState("all");
   const [coreOnly, setCoreOnly] = useState(false);
-
+  const [showSession, setShowSession] = useState(false);
   const dcwf = DATA.dcwf;
 
   const doSearch = useCallback(() => {
     if (!query || query.length < 2) { setResults([]); return; }
     const terms = query.toLowerCase().split(/\s+/).filter(t => t.length > 1);
     const scored = [];
-
     Object.entries(dcwf.rd).forEach(([code, rd]) => {
-      let score = 0;
-      let matchedTasks = [];
-      let matchedKsas = [];
-
-      rd.tasks.forEach(t => {
-        const entry = dcwf.ml[t.id];
-        if (!entry) return;
-        const text = entry.x.toLowerCase();
-        const isCore = t.c === "C";
-        const multi = isCore ? 1.5 : 1.0;
-        let matched = false;
-        terms.forEach(term => {
-          if (text.includes(term)) { score += 5 * multi; matched = true; }
-        });
-        if (matched && (!coreOnly || isCore)) matchedTasks.push({id: t.id, core: t.c, text: entry.x});
-      });
-
-      rd.ksas.forEach(k => {
-        const entry = dcwf.ml[k.id];
-        if (!entry) return;
-        const text = entry.x.toLowerCase();
-        const isCore = k.c === "C";
-        const multi = isCore ? 1.5 : 1.0;
-        let matched = false;
-        terms.forEach(term => {
-          if (text.includes(term)) { score += 4 * multi; matched = true; }
-        });
-        if (matched && (!coreOnly || isCore)) matchedKsas.push({id: k.id, core: k.c, text: entry.x});
-      });
-
-      // Also match role name and definition
+      let score = 0, matchedTasks = [], matchedKsas = [];
+      rd.tasks.forEach(t => { const e = dcwf.ml[t.id]; if (!e) return; const txt = e.x.toLowerCase(); const m = isCore = t.c === "C", multi = m ? 1.5 : 1.0; let hit = false; terms.forEach(term => { if (txt.includes(term)) { score += 5 * multi; hit = true; } }); if (hit && (!coreOnly || m)) matchedTasks.push({id: t.id, core: t.c, text: e.x}); });
+      rd.ksas.forEach(k => { const e = dcwf.ml[k.id]; if (!e) return; const txt = e.x.toLowerCase(); const m = k.c === "C", multi = m ? 1.5 : 1.0; let hit = false; terms.forEach(term => { if (txt.includes(term)) { score += 4 * multi; hit = true; } }); if (hit && (!coreOnly || m)) matchedKsas.push({id: k.id, core: k.c, text: e.x}); });
       const nameLC = (rd.def + " " + (dcwf.roles.find(r=>r.code===code)?.name||"")).toLowerCase();
       terms.forEach(term => { if (nameLC.includes(term)) score += 3; });
-
       if (score > 0 && (scopeFilter === "all" || (scopeFilter === "tasks" && matchedTasks.length > 0) || (scopeFilter === "ksas" && matchedKsas.length > 0))) {
         const role = dcwf.roles.find(r => r.code === code);
-        scored.push({
-          code, score,
-          name: role?.name || code,
-          element: rd.el,
-          opr: rd.opr,
-          def: rd.def,
-          matchedTasks,
-          matchedKsas,
-          totalCoreTasks: rd.tasks.filter(t=>t.c==="C").length,
-          totalAddTasks: rd.tasks.filter(t=>t.c==="A").length,
-          totalCoreKsas: rd.ksas.filter(k=>k.c==="C").length,
-          totalAddKsas: rd.ksas.filter(k=>k.c==="A").length,
-        });
+        scored.push({ code, score, name: role?.name || code, element: rd.el, opr: rd.opr, def: rd.def, matchedTasks, matchedKsas, totalCoreTasks: rd.tasks.filter(t=>t.c==="C").length, totalAddTasks: rd.tasks.filter(t=>t.c==="A").length, totalCoreKsas: rd.ksas.filter(k=>k.c==="C").length, totalAddKsas: rd.ksas.filter(k=>k.c==="A").length });
       }
     });
-
     scored.sort((a,b) => b.score - a.score);
     setResults(scored.slice(0, 15));
   }, [query, dcwf, coreOnly, scopeFilter]);
 
-  const addToSession = (result) => {
-    if (session.length >= 3) return;
-    if (session.find(s => s.code === result.code)) return;
-    setSession([...session, {
-      ...result,
-      assignType: session.length === 0 ? "primary" : "additional",
-      proficiency: ""
-    }]);
-  };
-
-  const removeFromSession = (code) => {
-    setSession(session.filter(s => s.code !== code));
-  };
-
-  const updateSession = (code, field, value) => {
-    setSession(session.map(s => s.code === code ? {...s, [field]: value} : s));
-  };
-
-  const accent = "#3b82f6";
+  const addToSession = (r) => { if (session.length >= 3 || session.find(s => s.code === r.code)) return; setSession([...session, { ...r, assignType: session.length === 0 ? "primary" : "additional", proficiency: "" }]); };
+  const removeFromSession = (code) => setSession(session.filter(s => s.code !== code));
+  const updateSession = (code, field, value) => setSession(session.map(s => s.code === code ? {...s, [field]: value} : s));
 
   return (
-    <div style={{padding:"0 24px 24px"}}>
-      {/* Search Section */}
-      <div style={{background:"#111827",borderRadius:12,padding:"20px",border:"1px solid #1e293b",marginBottom:16}}>
-        <div style={{fontSize:14,fontWeight:700,color:"#e2e8f0",marginBottom:4}}>Find Work Role by Task or KSA</div>
-        <div style={{fontSize:10,color:"#64748b",marginBottom:12}}>Search by task, KSA, or duty statement. DCWF coding should be based on the work performed, not the local position title.</div>
-
-        <div style={{display:"flex",gap:10,marginBottom:12}}>
-          <input type="text" value={query} onChange={e=>setQuery(e.target.value)}
-            onKeyDown={e=>{if(e.key==="Enter")doSearch();}}
-            placeholder="e.g. secure code, RMF, incident response, systems engineering, access control..."
-            style={{flex:1,padding:"10px 14px",borderRadius:8,border:"1px solid #1e293b",background:"#0c1220",color:"#e2e8f0",fontSize:12,outline:"none"}}/>
-          <button onClick={doSearch} style={{padding:"10px 20px",borderRadius:8,background:"#3b82f6",border:"none",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>Search</button>
+    <div style={{padding:"16px",maxWidth:1200,margin:"0 auto"}}>
+      {/* Search */}
+      <div style={{background:"#111827",borderRadius:16,padding:"20px",border:"1px solid #1e293b",marginBottom:16}}>
+        <div style={{fontSize:16,fontWeight:700,color:"#e2e8f0",marginBottom:4}}>Find Work Role by Task or KSA</div>
+        <div style={{fontSize:12,color:"#64748b",marginBottom:14}}>DCWF coding is based on work performed, not position title.</div>
+        <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+          <input type="text" value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")doSearch();}}
+            placeholder="e.g. secure code, RMF, incident response..."
+            style={{flex:1,minWidth:200,padding:"12px 16px",borderRadius:10,border:"1px solid #1e293b",background:"#0c1220",color:"#e2e8f0",fontSize:14,outline:"none"}}/>
+          <button onClick={doSearch} style={{padding:"12px 24px",borderRadius:10,background:"linear-gradient(135deg,#3b82f6,#2563eb)",border:"none",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>Search</button>
         </div>
-
-        <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
-          <div style={{display:"flex",gap:4,alignItems:"center"}}>
-            <span style={{fontSize:10,color:"#64748b"}}>Scope:</span>
-            {[{k:"all",l:"All"},{k:"tasks",l:"Tasks"},{k:"ksas",l:"KSAs"}].map(o=>
-              <button key={o.k} onClick={()=>setScopeFilter(o.k)} style={{padding:"3px 10px",borderRadius:5,fontSize:10,border:"1px solid "+(scopeFilter===o.k?"#3b82f6":"#1e293b"),background:scopeFilter===o.k?"#1e3050":"transparent",color:scopeFilter===o.k?"#e2e8f0":"#64748b",cursor:"pointer"}}>{o.l}</button>
-            )}
-          </div>
-          <label style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:"#64748b",cursor:"pointer"}}>
-            <input type="checkbox" checked={coreOnly} onChange={e=>setCoreOnly(e.target.checked)} style={{accentColor:"#3b82f6"}}/>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          {[{k:"all",l:"All"},{k:"tasks",l:"Tasks"},{k:"ksas",l:"KSAs"}].map(o=>
+            <button key={o.k} onClick={()=>setScopeFilter(o.k)} style={{padding:"6px 14px",borderRadius:8,fontSize:12,border:"1px solid "+(scopeFilter===o.k?"#3b82f6":"#1e293b"),background:scopeFilter===o.k?"#1e3050":"transparent",color:scopeFilter===o.k?"#e2e8f0":"#64748b",cursor:"pointer",fontWeight:600}}>{o.l}</button>
+          )}
+          <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#94a3b8",cursor:"pointer",marginLeft:8}}>
+            <input type="checkbox" checked={coreOnly} onChange={e=>setCoreOnly(e.target.checked)} style={{accentColor:"#3b82f6",width:16,height:16}}/>
             Core only
           </label>
+          {session.length > 0 && <button onClick={()=>setShowSession(!showSession)} style={{marginLeft:"auto",padding:"6px 14px",borderRadius:8,fontSize:12,border:"1px solid #8b5cf6",background:showSession?"#3b1f7a":"transparent",color:"#8b5cf6",cursor:"pointer",fontWeight:600}}>Session ({session.length})</button>}
         </div>
       </div>
 
+      {/* Mobile Session Toggle */}
+      {showSession && session.length > 0 && <SessionPanel session={session} removeFromSession={removeFromSession} updateSession={updateSession} onClose={()=>setShowSession(false)} onCompare={onCompare} />}
+
+      {/* Results */}
       <div style={{display:"flex",gap:16,alignItems:"flex-start"}}>
-        {/* Results */}
-        <div style={{flex:2,minWidth:0}}>
-          {results.length > 0 && <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",marginBottom:8}}>Matching Roles ({results.length})</div>}
-          {results.map((r,i) => {
+        <div style={{flex:1,minWidth:0}}>
+          {results.length > 0 && <div style={{fontSize:12,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",marginBottom:10,paddingLeft:4}}>Matching Roles ({results.length})</div>}
+          {results.map(r => {
             const ac = getAc(r.element);
-            const isInSession = session.find(s=>s.code===r.code);
-            return <div key={r.code} style={{background:"#0d1525",borderRadius:10,border:"1px solid "+(isInSession?ac:"#1e293b")+"40",padding:"12px 16px",marginBottom:8}}>
-              <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
-                <div style={{width:40,height:40,borderRadius:8,background:"linear-gradient(135deg, "+ac+"30, "+ac+"10)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,color:ac,border:"1px solid "+ac+"40",flexShrink:0}}>{r.code}</div>
+            const inS = session.find(s=>s.code===r.code);
+            return <div key={r.code} style={{background:"#0d1525",borderRadius:14,border:"1px solid "+(inS?ac:"#1e293b")+"40",padding:"16px",marginBottom:10,transition:"border-color 0.2s"}}>
+              <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
+                <div style={{width:48,height:48,borderRadius:12,background:"linear-gradient(135deg, "+ac+"30, "+ac+"10)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:900,color:ac,border:"1px solid "+ac+"40",flexShrink:0}}>{r.code}</div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9"}}>{r.name}</div>
-                  <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>
-                    <span style={{fontSize:9,padding:"1px 6px",borderRadius:4,background:getBd(r.element),color:ac,fontWeight:600}}>{r.element}</span>
-                    <span style={{fontSize:9,padding:"1px 6px",borderRadius:4,background:"#1e293b",color:"#94a3b8"}}>OPR: {r.opr}</span>
-                    <span style={{fontSize:9,padding:"1px 6px",borderRadius:4,background:"#10b98120",color:"#10b981",fontWeight:600}}>Score: {Math.round(r.score)}</span>
-                    <span style={{fontSize:9,padding:"1px 6px",borderRadius:4,background:"#1e293b",color:"#94a3b8"}}>{r.matchedTasks.length} tasks, {r.matchedKsas.length} KSAs matched</span>
+                  <div style={{fontSize:15,fontWeight:700,color:"#f1f5f9"}}>{r.name}</div>
+                  <div style={{display:"flex",gap:6,marginTop:4,flexWrap:"wrap"}}>
+                    <span style={{fontSize:10,padding:"2px 8px",borderRadius:6,background:getBd(r.element),color:ac,fontWeight:600}}>{r.element}</span>
+                    <span style={{fontSize:10,padding:"2px 8px",borderRadius:6,background:"#1e293b",color:"#94a3b8"}}>OPR: {r.opr}</span>
+                    <span style={{fontSize:10,padding:"2px 8px",borderRadius:6,background:"#10b98115",color:"#10b981",fontWeight:700}}>Score: {Math.round(r.score)}</span>
+                    <span style={{fontSize:10,padding:"2px 8px",borderRadius:6,background:"#1e293b",color:"#94a3b8"}}>{r.matchedTasks.length}T {r.matchedKsas.length}K matched</span>
                   </div>
-                  <div style={{fontSize:10,color:"#78899a",marginTop:4,lineHeight:1.4}}>{r.def.substring(0,150)}{r.def.length>150?"...":""}</div>
-                </div>
-                <div style={{display:"flex",flexDirection:"column",gap:4,flexShrink:0}}>
-                  <button onClick={()=>setDetail(detail?.code===r.code?null:r)} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #334155",background:"transparent",color:"#94a3b8",fontSize:10,cursor:"pointer"}}>{detail?.code===r.code?"Close":"Details"}</button>
-                  {!isInSession && session.length<3 && <button onClick={()=>addToSession(r)} style={{padding:"5px 12px",borderRadius:6,border:"none",background:ac,color:"#fff",fontSize:10,fontWeight:600,cursor:"pointer"}}>+ Add</button>}
-                  {isInSession && <span style={{fontSize:9,color:ac,fontWeight:600,textAlign:"center"}}>Added</span>}
+                  <div style={{fontSize:11,color:"#78899a",marginTop:6,lineHeight:1.5}}>{r.def.substring(0,180)}{r.def.length>180?"...":""}</div>
                 </div>
               </div>
-              {/* Detail panel */}
+              <div style={{display:"flex",gap:8,marginTop:10}}>
+                <button onClick={()=>setDetail(detail?.code===r.code?null:r)} style={{flex:1,padding:"8px",borderRadius:8,border:"1px solid #334155",background:detail?.code===r.code?"#1e293b":"transparent",color:"#94a3b8",fontSize:12,cursor:"pointer",fontWeight:600}}>{detail?.code===r.code?"Hide Details":"View Tasks & KSAs"}</button>
+                {!inS && session.length<3 && <button onClick={()=>addToSession(r)} style={{flex:1,padding:"8px",borderRadius:8,border:"none",background:"linear-gradient(135deg, "+ac+", "+ac+"cc)",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}>+ Add to Session</button>}
+                {inS && <div style={{flex:1,padding:"8px",borderRadius:8,background:ac+"15",color:ac,fontSize:12,fontWeight:600,textAlign:"center"}}>In Session</div>}
+              </div>
               {detail?.code===r.code && <DetailDrawer role={r} dcwf={dcwf} accent={ac}/>}
             </div>;
           })}
-          {results.length===0 && query.length > 0 && <div style={{textAlign:"center",padding:"30px",color:"#475569",fontSize:12}}>No matching roles found. Try different keywords.</div>}
+          {results.length===0 && query && <div style={{textAlign:"center",padding:"40px 20px",color:"#475569"}}><div style={{fontSize:14,marginBottom:6}}>No matching roles found</div><div style={{fontSize:12}}>Try different keywords or broaden the scope filter</div></div>}
+          {!query && results.length===0 && <div style={{textAlign:"center",padding:"50px 20px",color:"#334155"}}><div style={{fontSize:16,marginBottom:8,fontWeight:600}}>Search for DCWF Work Roles</div><div style={{fontSize:12,lineHeight:1.6,maxWidth:400,margin:"0 auto"}}>Enter task descriptions, KSA keywords, or duty statements to find matching work roles across all 74 DCWF positions. Results ranked by relevance.</div></div>}
         </div>
 
-        {/* Session Panel */}
-        <div style={{flex:1,minWidth:280,maxWidth:380,position:"sticky",top:20}}>
-          <div style={{background:"#111827",borderRadius:12,border:"1px solid #1e293b",padding:"16px"}}>
-            <div style={{fontSize:12,fontWeight:700,color:"#e2e8f0",textTransform:"uppercase",letterSpacing:"1px",marginBottom:4}}>Role Session</div>
-            <div style={{fontSize:10,color:"#64748b",marginBottom:12}}>A position must have one primary work role and may have up to two additional work roles.</div>
-
-            {session.length === 0 && <div style={{textAlign:"center",padding:"20px",color:"#334155",fontSize:11}}>No roles selected yet. Search and add roles from results.</div>}
-
-            {session.map((s,i) => {
-              const ac = getAc(s.element);
-              const coreTM = s.matchedTasks.filter(t=>t.core==="C").length;
-              const addTM = s.matchedTasks.filter(t=>t.core==="A").length;
-              const coreKM = s.matchedKsas.filter(k=>k.core==="C").length;
-              const addKM = s.matchedKsas.filter(k=>k.core==="A").length;
-              return <div key={s.code} style={{background:"#0d1525",borderRadius:8,border:"1px solid "+ac+"30",padding:"10px 12px",marginBottom:8}}>
-                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
-                  <span style={{fontSize:12,fontWeight:800,color:ac}}>{s.code}</span>
-                  <span style={{fontSize:11,fontWeight:600,color:"#e2e8f0",flex:1}}>{s.name.split("(")[0].trim()}</span>
-                  <button onClick={()=>removeFromSession(s.code)} style={{background:"none",border:"1px solid #334155",borderRadius:4,color:"#64748b",cursor:"pointer",padding:"1px 6px",fontSize:9}}>X</button>
-                </div>
-                <div style={{display:"flex",gap:6,marginBottom:6}}>
-                  <select value={s.assignType} onChange={e=>updateSession(s.code,"assignType",e.target.value)} style={{flex:1,padding:"4px 6px",borderRadius:5,border:"1px solid #1e293b",background:"#0c1220",color:"#e2e8f0",fontSize:10}}>
-                    <option value="primary">Primary</option>
-                    <option value="additional">Additional</option>
-                  </select>
-                  <select value={s.proficiency} onChange={e=>updateSession(s.code,"proficiency",e.target.value)} style={{flex:1,padding:"4px 6px",borderRadius:5,border:"1px solid #1e293b",background:"#0c1220",color:s.proficiency?"#e2e8f0":"#64748b",fontSize:10}}>
-                    <option value="">Proficiency...</option>
-                    {LEVELS.map(l=><option key={l} value={l}>{l}</option>)}
-                  </select>
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,fontSize:9,color:"#94a3b8"}}>
-                  <div>Core tasks: {coreTM}/{s.totalCoreTasks}</div>
-                  <div>Add tasks: {addTM}/{s.totalAddTasks}</div>
-                  <div>Core KSAs: {coreKM}/{s.totalCoreKsas}</div>
-                  <div>Add KSAs: {addKM}/{s.totalAddKsas}</div>
-                </div>
-              </div>;
-            })}
-
-            {session.length > 0 && (
-              <div style={{marginTop:8}}>
-                {session.filter(s=>s.assignType==="primary").length > 1 && <div style={{fontSize:10,color:"#ef4444",padding:"4px 8px",background:"#7f1d1d20",borderRadius:4,marginBottom:4}}>Only one role can be Primary.</div>}
-                {session.some(s=>!s.proficiency) && <div style={{fontSize:10,color:"#f59e0b",padding:"4px 8px",background:"#78350f20",borderRadius:4}}>Proficiency required for each role.</div>}
-              </div>
-            )}
-          </div>
-        </div>
+        {/* Desktop Session Panel */}
+        {session.length > 0 && <div style={{width:340,flexShrink:0,position:"sticky",top:20,display:"none"}} className="desktop-session"><SessionPanel session={session} removeFromSession={removeFromSession} updateSession={updateSession} onCompare={onCompare}/></div>}
       </div>
+
+      <style>{`@media(min-width:900px){.desktop-session{display:block !important;}}`}</style>
+    </div>
+  );
+}
+
+function SessionPanel({session, removeFromSession, updateSession, onClose, onCompare}) {
+  return (
+    <div style={{background:"#111827",borderRadius:14,border:"1px solid #1e293b",padding:"16px",marginBottom:16}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#e2e8f0",textTransform:"uppercase",letterSpacing:"1px"}}>Role Session ({session.length}/3)</div>
+        {onClose && <button onClick={onClose} style={{background:"none",border:"1px solid #334155",borderRadius:6,color:"#64748b",cursor:"pointer",padding:"4px 10px",fontSize:11}}>Close</button>}
+      </div>
+      <div style={{fontSize:11,color:"#64748b",marginBottom:12}}>1 Primary + up to 2 Additional. Proficiency required for each.</div>
+      {session.map(s => {
+        const ac = getAc(s.element);
+        return <div key={s.code} style={{background:"#0d1525",borderRadius:10,border:"1px solid "+ac+"30",padding:"12px",marginBottom:8}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+            <span style={{fontSize:14,fontWeight:900,color:ac}}>{s.code}</span>
+            <span style={{fontSize:12,fontWeight:600,color:"#e2e8f0",flex:1}}>{s.name.split("(")[0].trim()}</span>
+            <button onClick={()=>removeFromSession(s.code)} style={{background:"none",border:"1px solid #334155",borderRadius:6,color:"#64748b",cursor:"pointer",padding:"2px 8px",fontSize:10}}>X</button>
+          </div>
+          <div style={{display:"flex",gap:8,marginBottom:8}}>
+            <select value={s.assignType} onChange={e=>updateSession(s.code,"assignType",e.target.value)} style={{flex:1,padding:"8px",borderRadius:8,border:"1px solid #1e293b",background:"#0c1220",color:"#e2e8f0",fontSize:12}}>
+              <option value="primary">Primary</option>
+              <option value="additional">Additional</option>
+            </select>
+            <select value={s.proficiency} onChange={e=>updateSession(s.code,"proficiency",e.target.value)} style={{flex:1,padding:"8px",borderRadius:8,border:"1px solid #1e293b",background:"#0c1220",color:s.proficiency?"#e2e8f0":"#64748b",fontSize:12}}>
+              <option value="">Proficiency...</option>
+              {LEVELS.map(l=><option key={l} value={l}>{l}</option>)}
+            </select>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,fontSize:10,color:"#94a3b8"}}>
+            <div>Core tasks: {s.matchedTasks.filter(t=>t.core==="C").length}/{s.totalCoreTasks}</div>
+            <div>Add tasks: {s.matchedTasks.filter(t=>t.core==="A").length}/{s.totalAddTasks}</div>
+            <div>Core KSAs: {s.matchedKsas.filter(k=>k.core==="C").length}/{s.totalCoreKsas}</div>
+            <div>Add KSAs: {s.matchedKsas.filter(k=>k.core==="A").length}/{s.totalAddKsas}</div>
+          </div>
+        </div>;
+      })}
+      {session.filter(s=>s.assignType==="primary").length > 1 && <div style={{fontSize:11,color:"#ef4444",padding:"6px 10px",background:"#7f1d1d20",borderRadius:8,marginTop:4}}>Only one role can be Primary.</div>}
+      {session.some(s=>!s.proficiency) && <div style={{fontSize:11,color:"#f59e0b",padding:"6px 10px",background:"#78350f20",borderRadius:8,marginTop:4}}>Proficiency required for each role.</div>}
+      {session.length >= 2 && onCompare && <button onClick={()=>onCompare(session)} style={{width:"100%",marginTop:10,padding:"10px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#8b5cf6,#6d28d9)",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+        <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M9 5l7 7-7 7"/></svg>
+        Compare {session.length} Roles in Matrix
+      </button>}
+      {session.length === 1 && <button onClick={()=>onCompare && onCompare(session)} style={{width:"100%",marginTop:10,padding:"10px",borderRadius:10,border:"1px solid #334155",background:"transparent",color:"#94a3b8",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+        View in Matrix
+      </button>}
     </div>
   );
 }
@@ -237,79 +192,63 @@ function DetailDrawer({role, dcwf, accent}) {
   const [filter, setFilter] = useState("all");
   const rd = dcwf.rd[role.code];
   if (!rd) return null;
-
   const matchedIds = new Set([...role.matchedTasks.map(t=>t.id), ...role.matchedKsas.map(k=>k.id)]);
-
-  const renderItems = (items, type) => {
-    let filtered = items.map(item => {
-      const entry = dcwf.ml[item.id];
-      return { ...item, text: entry?.x || "", matched: matchedIds.has(item.id) };
-    });
-    if (filter === "core") filtered = filtered.filter(i => i.c === "C");
-    if (filter === "add") filtered = filtered.filter(i => i.c === "A");
-    if (filter === "matched") filtered = filtered.filter(i => i.matched);
-
-    return <div style={{maxHeight:300,overflowY:"auto"}}>
-      {filtered.map((item,i) => (
-        <div key={i} style={{padding:"6px 10px",borderBottom:"1px solid #1e293b",display:"flex",gap:8,alignItems:"flex-start",background:item.matched?"#10b98108":"transparent"}}>
-          <span style={{fontSize:9,fontWeight:700,color:"#64748b",minWidth:45,flexShrink:0}}>{item.id}</span>
-          <span style={{fontSize:10,color:item.matched?"#e2e8f0":"#78899a",lineHeight:1.4,flex:1}}>{item.text}</span>
-          <div style={{display:"flex",gap:3,flexShrink:0}}>
-            <span style={{fontSize:8,padding:"1px 5px",borderRadius:3,background:item.c==="C"?"#3b82f620":"#1e293b",color:item.c==="C"?"#3b82f6":"#64748b"}}>{item.c==="C"?"CORE":"ADD"}</span>
-            {item.matched && <span style={{fontSize:8,padding:"1px 5px",borderRadius:3,background:"#10b98120",color:"#10b981"}}>MATCH</span>}
-          </div>
+  const renderItems = (items) => {
+    let fl = items.map(item => { const e = dcwf.ml[item.id]; return { ...item, text: e?.x || "", matched: matchedIds.has(item.id) }; });
+    if (filter === "core") fl = fl.filter(i => i.c === "C");
+    if (filter === "add") fl = fl.filter(i => i.c === "A");
+    if (filter === "matched") fl = fl.filter(i => i.matched);
+    return <div style={{maxHeight:350,overflowY:"auto"}}>{fl.map((item,i) => (
+      <div key={i} style={{padding:"8px 12px",borderBottom:"1px solid #1e293b",display:"flex",gap:8,alignItems:"flex-start",background:item.matched?"#10b98108":"transparent"}}>
+        <span style={{fontSize:10,fontWeight:700,color:"#64748b",minWidth:50,flexShrink:0}}>{item.id}</span>
+        <span style={{fontSize:11,color:item.matched?"#e2e8f0":"#78899a",lineHeight:1.5,flex:1}}>{item.text}</span>
+        <div style={{display:"flex",gap:4,flexShrink:0}}>
+          <span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:item.c==="C"?"#3b82f620":"#1e293b",color:item.c==="C"?"#3b82f6":"#64748b",fontWeight:600}}>{item.c==="C"?"CORE":"ADD"}</span>
+          {item.matched && <span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:"#10b98120",color:"#10b981",fontWeight:600}}>MATCH</span>}
         </div>
-      ))}
-      {filtered.length === 0 && <div style={{padding:12,textAlign:"center",color:"#475569",fontSize:10}}>No items match current filter.</div>}
-    </div>;
+      </div>
+    ))}{fl.length===0&&<div style={{padding:16,textAlign:"center",color:"#475569",fontSize:11}}>No items match filter.</div>}</div>;
   };
-
   return (
-    <div style={{marginTop:10,background:"#0a0f1a",borderRadius:8,border:"1px solid "+accent+"20",overflow:"hidden"}}>
+    <div style={{marginTop:12,background:"#0a0f1a",borderRadius:12,border:"1px solid "+accent+"20",overflow:"hidden"}}>
       <div style={{display:"flex",borderBottom:"1px solid #1e293b"}}>
         {[{k:"tasks",l:"Tasks ("+rd.tasks.length+")"},{k:"ksas",l:"KSAs ("+rd.ksas.length+")"}].map(t=>
-          <button key={t.k} onClick={()=>setTab(t.k)} style={{flex:1,padding:"8px",border:"none",borderBottom:tab===t.k?"2px solid "+accent:"2px solid transparent",background:"transparent",color:tab===t.k?"#e2e8f0":"#64748b",fontSize:11,fontWeight:600,cursor:"pointer"}}>{t.l}</button>
+          <button key={t.k} onClick={()=>setTab(t.k)} style={{flex:1,padding:"10px",border:"none",borderBottom:tab===t.k?"2px solid "+accent:"2px solid transparent",background:"transparent",color:tab===t.k?"#e2e8f0":"#64748b",fontSize:12,fontWeight:600,cursor:"pointer"}}>{t.l}</button>
         )}
       </div>
-      <div style={{display:"flex",gap:4,padding:"6px 10px",borderBottom:"1px solid #1e293b"}}>
+      <div style={{display:"flex",gap:4,padding:"8px 12px",borderBottom:"1px solid #1e293b",flexWrap:"wrap"}}>
         {[{k:"all",l:"All"},{k:"core",l:"Core"},{k:"add",l:"Additional"},{k:"matched",l:"Matched"}].map(f=>
-          <button key={f.k} onClick={()=>setFilter(f.k)} style={{padding:"2px 8px",borderRadius:4,fontSize:9,border:"1px solid "+(filter===f.k?"#3b82f6":"#1e293b"),background:filter===f.k?"#1e3050":"transparent",color:filter===f.k?"#e2e8f0":"#64748b",cursor:"pointer"}}>{f.l}</button>
+          <button key={f.k} onClick={()=>setFilter(f.k)} style={{padding:"4px 10px",borderRadius:6,fontSize:10,border:"1px solid "+(filter===f.k?"#3b82f6":"#1e293b"),background:filter===f.k?"#1e3050":"transparent",color:filter===f.k?"#e2e8f0":"#64748b",cursor:"pointer",fontWeight:600}}>{f.l}</button>
         )}
       </div>
-      {tab==="tasks" && renderItems(rd.tasks, "task")}
-      {tab==="ksas" && renderItems(rd.ksas, "ksa")}
+      {tab==="tasks"&&renderItems(rd.tasks)}
+      {tab==="ksas"&&renderItems(rd.ksas)}
     </div>
   );
 }
 
-/* ========== EXISTING 8140 MATRIX COMPONENTS ========== */
+/* ========== 8140 MATRIX COMPONENTS ========== */
 function getRD(code){const c=String(code);return{def:DATA.definitions[c]||"",edu:DATA.education[c]||{},certs:DATA.certifications[c]||{},train:DATA.training[c]||{}};}
 function getMR(code){const c=String(code);const rd={edu:DATA.education[c]||{},certs:DATA.certifications[c]||{},train:DATA.training[c]||{}};const def=DATA.definitions[c]||"";const ml=LEVELS.find(l=>(rd.certs[l]?.length||0)+(rd.train[l]?.length||0)+(rd.edu[l]?.length||0)>0)||null;const mc=ml?(rd.certs[ml]||[]).map(x=>x.acronym||x):[];return{def,ml,mc,tc:LEVELS.reduce((s,l)=>s+(rd.certs[l]?.length||0),0),tt:LEVELS.reduce((s,l)=>s+(rd.train[l]?.length||0),0)};}
 
-function DetailPanel({item,type,accent,onClose}){
-  if(!item)return null;
-  const findWR=(wrc)=>{const f=Object.values(DATA.elements).flat().find(w=>String(w.code)===String(wrc));return f?f.name:"WRC "+wrc;};
-  if(type==="cert"){const ci=DATA.certIndex[item.acronym];const roles=[];Object.entries(DATA.certifications).forEach(([wrc,lvls])=>{Object.entries(lvls).forEach(([level,certs])=>{if(certs.some(c=>c.acronym===item.acronym))roles.push({wrc,level});});});return <div style={{padding:"12px 14px",background:"#0a0f1a",border:"1px solid "+accent+"30",borderRadius:8,margin:"6px 8px"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}><div><div style={{fontSize:14,fontWeight:700,color:accent}}>{item.acronym}</div><div style={{fontSize:12,fontWeight:600,color:"#e2e8f0",marginTop:2}}>{ci?.name||item.acronym}</div><div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>{ci?.vendor||item.vendor||""}</div></div><button onClick={onClose} style={{background:"none",border:"1px solid #334155",borderRadius:5,color:"#64748b",cursor:"pointer",padding:"2px 8px",fontSize:10,flexShrink:0,height:22}}>Close</button></div>{roles.length>0&&<div><div style={{fontSize:9,fontWeight:700,color:"#64748b",textTransform:"uppercase",marginBottom:4}}>Approved for {roles.length} roles:</div><div style={{display:"flex",flexWrap:"wrap",gap:3}}>{roles.map((r,j)=><span key={j} style={{fontSize:10,padding:"2px 7px",borderRadius:4,background:"#1e293b",color:"#94a3b8",border:"1px solid #2a3545"}}>{r.wrc}-{findWR(r.wrc).split(" ")[0]} <span style={{color:accent,fontWeight:600}}>({r.level})</span></span>)}</div></div>}</div>;}
-  if(type==="train"){const roles=[];Object.entries(DATA.training).forEach(([wrc,lvls])=>{Object.entries(lvls).forEach(([level,courses])=>{if(courses&&courses.some(c=>(c.number||c.title)===(item.number||item.title)))roles.push({wrc,level});});});return <div style={{padding:"12px 14px",background:"#0a0f1a",border:"1px solid "+accent+"30",borderRadius:8,margin:"6px 8px"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}><div><div style={{fontSize:13,fontWeight:700,color:"#e2e8f0"}}>{item.title}</div><div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>{item.number&&<span>ID: {item.number}</span>}{item.component&&<span>{" | "}{item.component}</span>}{item.duration&&<span>{" | "}{item.duration}</span>}</div></div><button onClick={onClose} style={{background:"none",border:"1px solid #334155",borderRadius:5,color:"#64748b",cursor:"pointer",padding:"2px 8px",fontSize:10,flexShrink:0,height:22}}>Close</button></div>{item.desc&&<div style={{marginBottom:8}}><div style={{fontSize:9,fontWeight:700,color:accent,textTransform:"uppercase",marginBottom:3}}>Description</div><div style={{fontSize:10.5,color:"#b0bec5",lineHeight:1.55,whiteSpace:"pre-wrap"}}>{item.desc}</div></div>}{!item.desc&&<div style={{fontSize:10,color:"#64748b",fontStyle:"italic",marginBottom:8}}>No description available.</div>}{roles.length>0&&<div><div style={{fontSize:9,fontWeight:700,color:"#64748b",textTransform:"uppercase",marginBottom:4}}>Used by {roles.length} roles:</div><div style={{display:"flex",flexWrap:"wrap",gap:3}}>{roles.map((r,j)=><span key={j} style={{fontSize:10,padding:"2px 7px",borderRadius:4,background:"#1e293b",color:"#94a3b8",border:"1px solid #2a3545"}}>{r.wrc}-{findWR(r.wrc).split(" ")[0]} <span style={{color:accent,fontWeight:600}}>({r.level})</span></span>)}</div></div>}</div>;}
-  return null;
-}
+function DetailPanel({item,type,accent,onClose}){if(!item)return null;const findWR=wrc=>{const f=Object.values(DATA.elements).flat().find(w=>String(w.code)===String(wrc));return f?f.name:"WRC "+wrc;};if(type==="cert"){const ci=DATA.certIndex[item.acronym];const roles=[];Object.entries(DATA.certifications).forEach(([wrc,lvls])=>{Object.entries(lvls).forEach(([level,certs])=>{if(certs.some(c=>c.acronym===item.acronym))roles.push({wrc,level});});});return <div style={{padding:"14px",background:"#0a0f1a",border:"1px solid "+accent+"30",borderRadius:12,margin:"8px"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}><div><div style={{fontSize:16,fontWeight:700,color:accent}}>{item.acronym}</div><div style={{fontSize:13,fontWeight:600,color:"#e2e8f0",marginTop:2}}>{ci?.name||item.acronym}</div><div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>{ci?.vendor||item.vendor||""}</div></div><button onClick={onClose} style={{background:"none",border:"1px solid #334155",borderRadius:6,color:"#64748b",cursor:"pointer",padding:"4px 12px",fontSize:11,height:28}}>Close</button></div>{roles.length>0&&<div><div style={{fontSize:10,fontWeight:700,color:"#64748b",textTransform:"uppercase",marginBottom:6}}>Approved for {roles.length} roles:</div><div style={{display:"flex",flexWrap:"wrap",gap:4}}>{roles.map((r,j)=><span key={j} style={{fontSize:11,padding:"3px 8px",borderRadius:6,background:"#1e293b",color:"#94a3b8"}}>{r.wrc}-{findWR(r.wrc).split(" ")[0]} <span style={{color:accent,fontWeight:600}}>({r.level})</span></span>)}</div></div>}</div>;}if(type==="train"){const roles=[];Object.entries(DATA.training).forEach(([wrc,lvls])=>{Object.entries(lvls).forEach(([level,courses])=>{if(courses&&courses.some(c=>(c.number||c.title)===(item.number||item.title)))roles.push({wrc,level});});});return <div style={{padding:"14px",background:"#0a0f1a",border:"1px solid "+accent+"30",borderRadius:12,margin:"8px"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}><div><div style={{fontSize:14,fontWeight:700,color:"#e2e8f0"}}>{item.title}</div><div style={{fontSize:12,color:"#94a3b8",marginTop:3}}>{item.number&&<span>ID: {item.number}</span>}{item.component&&<span>{" | "}{item.component}</span>}{item.duration&&<span>{" | "}{item.duration}</span>}</div></div><button onClick={onClose} style={{background:"none",border:"1px solid #334155",borderRadius:6,color:"#64748b",cursor:"pointer",padding:"4px 12px",fontSize:11,height:28}}>Close</button></div>{item.desc&&<div style={{marginBottom:10}}><div style={{fontSize:10,fontWeight:700,color:accent,textTransform:"uppercase",marginBottom:4}}>Description</div><div style={{fontSize:12,color:"#b0bec5",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{item.desc}</div></div>}{!item.desc&&<div style={{fontSize:11,color:"#64748b",fontStyle:"italic",marginBottom:10}}>No description available.</div>}{roles.length>0&&<div><div style={{fontSize:10,fontWeight:700,color:"#64748b",textTransform:"uppercase",marginBottom:6}}>Used by {roles.length} roles:</div><div style={{display:"flex",flexWrap:"wrap",gap:4}}>{roles.map((r,j)=><span key={j} style={{fontSize:11,padding:"3px 8px",borderRadius:6,background:"#1e293b",color:"#94a3b8"}}>{r.wrc}-{findWR(r.wrc).split(" ")[0]} <span style={{color:accent,fontWeight:600}}>({r.level})</span></span>)}</div></div>}</div>;}return null;}
 
-function SC({role,element,accent,compact}){const m=useMemo(()=>getMR(role.code),[role.code]);if(compact)return <div style={{padding:"6px 0 2px",borderTop:"1px solid rgba(30,41,59,0.3)"}}><div style={{fontSize:10,color:"#78899a",lineHeight:1.4,marginBottom:4}}>{m.def.substring(0,120)}{m.def.length>120?"...":""}</div><div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{m.ml&&<span style={{fontSize:9,padding:"1px 6px",borderRadius:4,background:accent+"20",color:accent,fontWeight:600}}>Entry: {m.ml}</span>}{m.tc>0&&<span style={{fontSize:9,padding:"1px 6px",borderRadius:4,background:"#1e293b",color:"#94a3b8"}}>{m.tc} certs</span>}{m.tt>0&&<span style={{fontSize:9,padding:"1px 6px",borderRadius:4,background:"#1e293b",color:"#94a3b8"}}>{m.tt} courses</span>}</div></div>;return <div style={{margin:"0 24px 12px",padding:"14px 18px",background:"linear-gradient(135deg, "+accent+"08 0%, #111827 100%)",borderRadius:10,border:"1px solid "+accent+"20"}}><div style={{fontSize:11,color:"#94a3b8",lineHeight:1.5,marginBottom:12}}>{m.def.substring(0,300)}{m.def.length>300?"...":""}</div></div>;}
+function SC({role,element,accent,compact}){const m=useMemo(()=>getMR(role.code),[role.code]);if(compact)return <div style={{padding:"8px 0 2px",borderTop:"1px solid rgba(30,41,59,0.3)"}}><div style={{fontSize:11,color:"#78899a",lineHeight:1.4,marginBottom:4}}>{m.def.substring(0,120)}{m.def.length>120?"...":""}</div><div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{m.ml&&<span style={{fontSize:10,padding:"2px 8px",borderRadius:6,background:accent+"20",color:accent,fontWeight:600}}>Entry: {m.ml}</span>}{m.tc>0&&<span style={{fontSize:10,padding:"2px 8px",borderRadius:6,background:"#1e293b",color:"#94a3b8"}}>{m.tc} certs</span>}{m.tt>0&&<span style={{fontSize:10,padding:"2px 8px",borderRadius:6,background:"#1e293b",color:"#94a3b8"}}>{m.tt} courses</span>}</div></div>;return <div style={{margin:"0 16px 12px",padding:"16px 20px",background:"linear-gradient(135deg, "+accent+"08 0%, #111827 100%)",borderRadius:14,border:"1px solid "+accent+"20"}}><div style={{fontSize:12,color:"#94a3b8",lineHeight:1.6,marginBottom:14}}>{m.def.substring(0,300)}{m.def.length>300?"...":""}</div></div>;}
 
 function getIK(item){if(typeof item==="string")return item;return item.acronym||item.number||item.title||JSON.stringify(item);}
 function compDiffs(rds){const sh={edu:{},certs:{},train:{}},un=rds.map(()=>({edu:{},certs:{},train:{}}));for(const cat of["edu","certs","train"])for(const l of LEVELS){const sets=rds.map(rd=>{const it=cat==="edu"?rd.edu[l]:cat==="certs"?rd.certs[l]:rd.train[l];return new Set((it||[]).map(getIK));});if(sets.length<2)continue;const inter=new Set([...sets[0]].filter(k=>sets.every(s=>s.has(k))));sh[cat][l]=inter;rds.forEach((_,i)=>{un[i][cat][l]=new Set([...sets[i]].filter(k=>!inter.has(k)));});}return{sh,un};}
 
-function LC({items,accent,sk,uk,onSelect,selKey}){if(!items||items.length===0)return <div style={{flex:1,minWidth:0,padding:10,textAlign:"center"}}><span style={{color:"#334155",fontSize:11,fontStyle:"italic"}}>--</span></div>;return <div style={{flex:1,minWidth:0,padding:"6px 4px"}}>{items.map((item,i)=>{const k=getIK(item);const isSh=sk?.has(k),isUn=uk?.has(k),ol=isUn?accent:undefined,gl=isUn?accent:undefined,sc=isSh?"#1a3040":undefined,isSel=selKey===k;if(typeof item==="string"){if(item.toUpperCase().includes("PENDING"))return <div key={i}><Badge color="#78350f">{item}</Badge></div>;if(item.includes("See 8140")||item.includes("Refer to"))return <div key={i} style={{fontSize:10,color:"#64748b",fontStyle:"italic",padding:"2px 4px",lineHeight:1.4}}>{item}</div>;return <div key={i}><Badge color={sc||(accent+"25")} outline={ol} glow={gl}>{item}</Badge></div>;}if(item.acronym)return <div key={i}><Badge color={isSel?(accent+"40"):(sc||(accent+"25"))} outline={isSel?accent:ol} glow={gl} onClick={()=>onSelect&&onSelect(item,"cert",k)}>{item.acronym}</Badge></div>;if(item.number||item.title)return <div key={i}><Badge color={isSel?(accent+"40"):(sc||"#1e293b")} outline={isSel?accent:ol} glow={gl} onClick={()=>onSelect&&onSelect(item,"train",k)}>{item.number||item.title.substring(0,35)}</Badge></div>;return null;})}</div>;}
+function LC({items,accent,sk,uk,onSelect,selKey}){if(!items||items.length===0)return <div style={{flex:1,minWidth:0,padding:10,textAlign:"center"}}><span style={{color:"#334155",fontSize:12}}>--</span></div>;return <div style={{flex:1,minWidth:0,padding:"8px 6px"}}>{items.map((item,i)=>{const k=getIK(item);const isSh=sk?.has(k),isUn=uk?.has(k),ol=isUn?accent:undefined,gl=isUn?accent:undefined,sc=isSh?"#1a3040":undefined,isSel=selKey===k;if(typeof item==="string"){if(item.toUpperCase().includes("PENDING"))return <div key={i}><Badge color="#78350f">{item}</Badge></div>;if(item.includes("See 8140")||item.includes("Refer to"))return <div key={i} style={{fontSize:11,color:"#64748b",fontStyle:"italic",padding:"3px 6px",lineHeight:1.4}}>{item}</div>;return <div key={i}><Badge color={sc||(accent+"25")} outline={ol} glow={gl}>{item}</Badge></div>;}if(item.acronym)return <div key={i}><Badge color={isSel?(accent+"40"):(sc||(accent+"25"))} outline={isSel?accent:ol} glow={gl} onClick={()=>onSelect&&onSelect(item,"cert",k)}>{item.acronym}</Badge></div>;if(item.number||item.title)return <div key={i}><Badge color={isSel?(accent+"40"):(sc||"#1e293b")} outline={isSel?accent:ol} glow={gl} onClick={()=>onSelect&&onSelect(item,"train",k)}>{item.number||item.title.substring(0,35)}</Badge></div>;return null;})}</div>;}
 
 function MS({icon,title,accent,data,sd,ud,onSelect,selKey}){return <div style={{marginBottom:2}}><SH icon={icon} title={title} accent={accent}/><div style={{display:"flex",borderBottom:"1px solid #1e293b"}}>{LEVELS.map(l=><LC key={l} items={data[l]||[]} accent={accent} sk={sd?.[l]} uk={ud?.[l]} onSelect={onSelect} selKey={selKey}/>)}</div></div>;}
 
-function RC({role,element,rd,accent,badge,onRemove,isComp,shD,unD}){const[detail,setDetail]=useState(null);const nC=LEVELS.reduce((s,l)=>s+(rd.certs[l]?.length||0),0),nT=LEVELS.reduce((s,l)=>s+(rd.train[l]?.length||0),0);const handleSelect=(item,type,key)=>{setDetail(detail&&detail.key===key?null:{item,type,key});};return <div style={{flex:1,minWidth:isComp?"340px":"auto",maxWidth:isComp?"50%":"100%",background:"#0d1525",borderRadius:12,border:"1px solid "+accent+"25",overflow:"hidden"}}><div style={{background:"linear-gradient(135deg, "+accent+"15 0%, #111827 100%)",padding:"14px 16px",borderBottom:"1px solid "+accent+"20"}}><div style={{display:"flex",alignItems:"flex-start",gap:12}}><div style={{width:44,height:44,borderRadius:10,background:"linear-gradient(135deg, "+accent+"30, "+accent+"10)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:900,color:accent,border:"1px solid "+accent+"40",flexShrink:0}}>{role.code}</div><div style={{flex:1,minWidth:0}}><div style={{display:"flex",alignItems:"center",gap:8}}><h3 style={{margin:0,fontSize:15,fontWeight:700,color:"#f1f5f9"}}>{role.name}</h3>{onRemove&&<button onClick={onRemove} style={{marginLeft:"auto",background:"none",border:"1px solid #334155",borderRadius:6,color:"#64748b",cursor:"pointer",padding:"2px 8px",fontSize:11,flexShrink:0}}>X</button>}</div><div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:5,background:badge,color:accent,fontWeight:600}}>{element}</span><span style={{fontSize:10,padding:"2px 8px",borderRadius:5,background:"#1e293b",color:"#94a3b8"}}>OPR: {role.opr}</span>{nC>0&&<span style={{fontSize:10,padding:"2px 8px",borderRadius:5,background:"#1a2332",color:"#94a3b8"}}>{nC} Certs</span>}{nT>0&&<span style={{fontSize:10,padding:"2px 8px",borderRadius:5,background:"#1a2332",color:"#94a3b8"}}>{nT} Courses</span>}</div>{rd.def&&<p style={{margin:"8px 0 0",fontSize:11,color:"#78899a",lineHeight:1.5}}>{rd.def.substring(0,isComp?200:500)}{rd.def.length>(isComp?200:500)?"...":""}</p>}</div></div></div><div style={{padding:"4px 8px 0",fontSize:10,color:"#475569",textAlign:"center"}}>Click any cert or training badge for details</div><div style={{display:"flex",margin:"4px 0 2px"}}>{LEVELS.map(l=><div key={l} style={{flex:1,textAlign:"center",padding:"6px 4px",fontSize:10,fontWeight:700,color:accent,textTransform:"uppercase",letterSpacing:"2px",background:accent+"08",borderBottom:"2px solid "+accent+"30"}}>{l}</div>)}</div><MS icon="[C]" title="Certifications" accent={accent} data={rd.certs} sd={shD?.certs} ud={unD?.certs} onSelect={handleSelect} selKey={detail?.key}/>{detail&&detail.type==="cert"&&<DetailPanel item={detail.item} type="cert" accent={accent} onClose={()=>setDetail(null)}/>}<MS icon="[E]" title="Education" accent={accent} data={rd.edu} sd={shD?.edu} ud={unD?.edu}/><MS icon="[T]" title="Training" accent={accent} data={Object.fromEntries(LEVELS.map(l=>[l,rd.train[l]||[]]))} sd={shD?.train} ud={unD?.train} onSelect={handleSelect} selKey={detail?.key}/>{detail&&detail.type==="train"&&<DetailPanel item={detail.item} type="train" accent={accent} onClose={()=>setDetail(null)}/>}<div style={{margin:"8px 8px 12px",padding:"10px 12px",background:"#0c1118",borderRadius:6,border:"1px solid #151d2b"}}><div style={{fontSize:10,color:"#64748b",lineHeight:1.5}}>Min 20hrs CPD/yr. Degrees must be accredited.</div></div></div>;}
+function RC({role,element,rd,accent,badge,onRemove,isComp,shD,unD}){const[det,setDet]=useState(null);const nC=LEVELS.reduce((s,l)=>s+(rd.certs[l]?.length||0),0),nT=LEVELS.reduce((s,l)=>s+(rd.train[l]?.length||0),0);const hs=(item,type,key)=>{setDet(det&&det.key===key?null:{item,type,key});};return <div style={{flex:1,minWidth:isComp?"320px":"auto",maxWidth:isComp?"50%":"100%",background:"#0d1525",borderRadius:14,border:"1px solid "+accent+"25",overflow:"hidden"}}><div style={{background:"linear-gradient(135deg, "+accent+"15 0%, #111827 100%)",padding:"16px 18px",borderBottom:"1px solid "+accent+"20"}}><div style={{display:"flex",alignItems:"flex-start",gap:12}}><div style={{width:48,height:48,borderRadius:12,background:"linear-gradient(135deg, "+accent+"30, "+accent+"10)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,fontWeight:900,color:accent,border:"1px solid "+accent+"40",flexShrink:0}}>{role.code}</div><div style={{flex:1,minWidth:0}}><div style={{display:"flex",alignItems:"center",gap:8}}><h3 style={{margin:0,fontSize:16,fontWeight:700,color:"#f1f5f9"}}>{role.name}</h3>{onRemove&&<button onClick={onRemove} style={{marginLeft:"auto",background:"none",border:"1px solid #334155",borderRadius:8,color:"#64748b",cursor:"pointer",padding:"4px 10px",fontSize:12,flexShrink:0}}>X</button>}</div><div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}><span style={{fontSize:11,padding:"3px 10px",borderRadius:8,background:badge,color:accent,fontWeight:600}}>{element}</span><span style={{fontSize:11,padding:"3px 10px",borderRadius:8,background:"#1e293b",color:"#94a3b8"}}>OPR: {role.opr}</span>{nC>0&&<span style={{fontSize:11,padding:"3px 10px",borderRadius:8,background:"#1a2332",color:"#94a3b8"}}>{nC} Certs</span>}{nT>0&&<span style={{fontSize:11,padding:"3px 10px",borderRadius:8,background:"#1a2332",color:"#94a3b8"}}>{nT} Courses</span>}</div>{rd.def&&<p style={{margin:"8px 0 0",fontSize:12,color:"#78899a",lineHeight:1.5}}>{rd.def.substring(0,isComp?180:500)}{rd.def.length>(isComp?180:500)?"...":""}</p>}</div></div></div><div style={{padding:"6px 12px 0",fontSize:11,color:"#475569",textAlign:"center"}}>Tap any cert or training badge for details</div><div style={{display:"flex",margin:"6px 0 2px"}}>{LEVELS.map(l=><div key={l} style={{flex:1,textAlign:"center",padding:"8px 4px",fontSize:11,fontWeight:700,color:accent,textTransform:"uppercase",letterSpacing:"2px",background:accent+"08",borderBottom:"2px solid "+accent+"30"}}>{l}</div>)}</div><MS icon="[C]" title="Certifications" accent={accent} data={rd.certs} sd={shD?.certs} ud={unD?.certs} onSelect={hs} selKey={det?.key}/>{det&&det.type==="cert"&&<DetailPanel item={det.item} type="cert" accent={accent} onClose={()=>setDet(null)}/>}<MS icon="[E]" title="Education" accent={accent} data={rd.edu} sd={shD?.edu} ud={unD?.edu}/><MS icon="[T]" title="Training" accent={accent} data={Object.fromEntries(LEVELS.map(l=>[l,rd.train[l]||[]]))} sd={shD?.train} ud={unD?.train} onSelect={hs} selKey={det?.key}/>{det&&det.type==="train"&&<DetailPanel item={det.item} type="train" accent={accent} onClose={()=>setDet(null)}/>}<div style={{margin:"8px 10px 14px",padding:"12px 14px",background:"#0c1118",borderRadius:10,border:"1px solid #151d2b"}}><div style={{fontSize:11,color:"#64748b",lineHeight:1.6}}>Min 20hrs CPD/yr. Degrees must be accredited.</div></div></div>;}
 
-function CS({selections,diffs}){const cats=[{key:"certs",label:"Certs"},{key:"edu",label:"Edu"},{key:"train",label:"Training"}];const stats=cats.map(cat=>{let sc=0;const up=selections.map(()=>0);for(const l of LEVELS){sc+=(diffs.sh[cat.key][l]?.size||0);selections.forEach((_,i)=>{up[i]+=(diffs.un[i][cat.key][l]?.size||0);});}return{...cat,sc,up};});return <div style={{margin:"0 24px 16px",padding:"16px 20px",background:"#111827",borderRadius:12,border:"1px solid #1e3050"}}><div style={{fontSize:13,fontWeight:700,color:"#e2e8f0",marginBottom:14}}>Comparison Summary</div><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{stats.map((st,i)=><div key={i} style={{background:"#0c1220",borderRadius:8,padding:"12px",border:"1px solid #1e293b"}}><div style={{fontSize:11,fontWeight:700,color:"#cbd5e1",marginBottom:8}}>{st.label}</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}><div style={{background:"#1a3040",borderRadius:6,padding:"6px 10px",textAlign:"center",minWidth:50}}><div style={{fontSize:18,fontWeight:800,color:"#94a3b8"}}>{st.sc}</div><div style={{fontSize:8,color:"#64748b"}}>Shared</div></div>{selections.map((sel,idx)=><div key={idx} style={{background:getAc(sel.element)+"10",border:"1px solid "+getAc(sel.element)+"30",borderRadius:6,padding:"6px 10px",textAlign:"center",minWidth:50}}><div style={{fontSize:18,fontWeight:800,color:getAc(sel.element)}}>{st.up[idx]}</div><div style={{fontSize:8,color:"#64748b"}}>{sel.role.code}</div></div>)}</div></div>)}</div></div>;}
+function CS({selections,diffs}){const cats=[{key:"certs",label:"Certs"},{key:"edu",label:"Edu"},{key:"train",label:"Training"}];const stats=cats.map(cat=>{let sc=0;const up=selections.map(()=>0);for(const l of LEVELS){sc+=(diffs.sh[cat.key][l]?.size||0);selections.forEach((_,i)=>{up[i]+=(diffs.un[i][cat.key][l]?.size||0);});}return{...cat,sc,up};});return <div style={{margin:"0 16px 16px",padding:"18px 20px",background:"#111827",borderRadius:14,border:"1px solid #1e3050"}}><div style={{fontSize:14,fontWeight:700,color:"#e2e8f0",marginBottom:14}}>Comparison Summary</div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10}}>{stats.map((st,i)=><div key={i} style={{background:"#0c1220",borderRadius:10,padding:"14px",border:"1px solid #1e293b"}}><div style={{fontSize:12,fontWeight:700,color:"#cbd5e1",marginBottom:8}}>{st.label}</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}><div style={{background:"#1a3040",borderRadius:8,padding:"8px 12px",textAlign:"center",minWidth:50}}><div style={{fontSize:20,fontWeight:800,color:"#94a3b8"}}>{st.sc}</div><div style={{fontSize:9,color:"#64748b"}}>Shared</div></div>{selections.map((sel,idx)=><div key={idx} style={{background:getAc(sel.element)+"10",border:"1px solid "+getAc(sel.element)+"30",borderRadius:8,padding:"8px 12px",textAlign:"center",minWidth:50}}><div style={{fontSize:20,fontWeight:800,color:getAc(sel.element)}}>{st.up[idx]}</div><div style={{fontSize:9,color:"#64748b"}}>{sel.role.code}</div></div>)}</div></div>)}</div></div>;}
 
-function DP(){const[tab,setTab]=useState("certs");const[search,setSearch]=useState("");const[exp,setExp]=useState(null);const findName=wrc=>{const f=Object.values(DATA.elements).flat().find(w=>String(w.code)===String(wrc));return f?f.name:"WRC "+wrc;};const ce=useMemo(()=>{const out=[];Object.keys(DATA.certIndex).sort().forEach(abbr=>{const info=DATA.certIndex[abbr];const roles=[];Object.entries(DATA.certifications).forEach(([wrc,lvls])=>{Object.entries(lvls).forEach(([level,certs])=>{if(certs.some(c=>c.acronym===abbr))roles.push({wrc,level});});});out.push({abbr,name:info.name,vendor:info.vendor,roles});});return out;},[]);const te=useMemo(()=>{const mp={};Object.entries(DATA.training).forEach(([wrc,lvls])=>{Object.entries(lvls).forEach(([level,courses])=>{if(!courses)return;courses.forEach(c=>{const ky=c.number||c.title;if(!mp[ky])mp[ky]={...c,roles:[]};mp[ky].roles.push({wrc,level});});});});return Object.values(mp).sort((a,b)=>(a.title||"").localeCompare(b.title||""));},[]);const fl=useMemo(()=>{const t=search.toLowerCase();if(tab==="certs")return ce.filter(e=>!t||e.abbr.toLowerCase().includes(t)||e.name.toLowerCase().includes(t)||e.vendor.toLowerCase().includes(t));return te.filter(e=>!t||(e.title||"").toLowerCase().includes(t)||(e.number||"").toLowerCase().includes(t)||(e.desc||"").toLowerCase().includes(t));},[tab,search,ce,te]);return <div style={{padding:"0 24px 24px"}}><div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>{[{k:"certs",l:"Certifications ("+ce.length+")"},{k:"train",l:"Training ("+te.length+")"}].map(t=><button key={t.k} onClick={()=>{setTab(t.k);setSearch("");setExp(null);}} style={{padding:"8px 16px",borderRadius:8,background:tab===t.k?"#1e3050":"#111827",border:"1px solid "+(tab===t.k?"#3b82f6":"#1e293b"),color:tab===t.k?"#e2e8f0":"#64748b",fontSize:12,fontWeight:600,cursor:"pointer"}}>{t.l}</button>)}<input type="text" placeholder={"Search..."} value={search} onChange={e=>setSearch(e.target.value)} style={{flex:1,minWidth:200,padding:"8px 12px",borderRadius:8,border:"1px solid #1e293b",background:"#0f172a",color:"#e2e8f0",fontSize:12,outline:"none"}}/><span style={{fontSize:11,color:"#64748b"}}>{fl.length}</span></div><div style={{maxHeight:"calc(100vh - 240px)",overflowY:"auto",borderRadius:8,border:"1px solid #1e293b"}}>{tab==="certs"&&fl.map((e,i)=>{const op=exp===("c-"+e.abbr);return <div key={i} style={{borderBottom:"1px solid #1e293b"}}><div onClick={()=>setExp(op?null:"c-"+e.abbr)} style={{padding:"10px 14px",cursor:"pointer",background:op?"#111827":"#0d1525",display:"flex",alignItems:"center",gap:10}} onMouseEnter={ev=>{if(!op)ev.currentTarget.style.background="#111827"}} onMouseLeave={ev=>{if(!op)ev.currentTarget.style.background="#0d1525"}}><span style={{fontSize:12,fontWeight:700,color:"#3b82f6",minWidth:110}}>{e.abbr}</span><div style={{flex:1}}><div style={{fontSize:12,color:"#e2e8f0",fontWeight:600}}>{e.name}</div><div style={{fontSize:10,color:"#64748b"}}>{e.vendor}</div></div><span style={{fontSize:10,padding:"2px 8px",borderRadius:4,background:"#1e293b",color:"#94a3b8"}}>{e.roles.length}</span></div>{op&&<div style={{padding:"12px 14px",background:"#0a0f1a",borderTop:"1px solid #1e293b"}}><div style={{display:"flex",flexWrap:"wrap",gap:4}}>{e.roles.map((r,j)=><span key={j} style={{fontSize:10,padding:"3px 8px",borderRadius:4,background:"#1e293b",color:"#94a3b8"}}>{r.wrc} - {findName(r.wrc)} ({r.level})</span>)}</div></div>}</div>;})}{tab==="train"&&fl.map((e,i)=>{const ky=e.number||e.title;const op=exp===("t-"+ky);return <div key={i} style={{borderBottom:"1px solid #1e293b"}}><div onClick={()=>setExp(op?null:"t-"+ky)} style={{padding:"10px 14px",cursor:"pointer",background:op?"#111827":"#0d1525",display:"flex",alignItems:"center",gap:10}} onMouseEnter={ev=>{if(!op)ev.currentTarget.style.background="#111827"}} onMouseLeave={ev=>{if(!op)ev.currentTarget.style.background="#0d1525"}}><div style={{flex:1}}><div style={{fontSize:12,color:"#e2e8f0",fontWeight:600}}>{e.title}</div><div style={{fontSize:10,color:"#64748b"}}>{e.number}{e.component&&" | "+e.component}{e.duration&&" | "+e.duration}</div></div>{e.desc&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:3,background:"#10b98120",color:"#10b981"}}>desc</span>}<span style={{fontSize:10,padding:"2px 8px",borderRadius:4,background:"#1e293b",color:"#94a3b8"}}>{e.roles.length}</span></div>{op&&<div style={{padding:"12px 14px",background:"#0a0f1a",borderTop:"1px solid #1e293b"}}>{e.desc&&<div style={{fontSize:11,color:"#b0bec5",lineHeight:1.55,marginBottom:8,whiteSpace:"pre-wrap"}}>{e.desc}</div>}<div style={{display:"flex",flexWrap:"wrap",gap:4}}>{e.roles.map((r,j)=><span key={j} style={{fontSize:10,padding:"3px 8px",borderRadius:4,background:"#1e293b",color:"#94a3b8"}}>{r.wrc} - {findName(r.wrc)} ({r.level})</span>)}</div></div>}</div>;})}</div></div>;}
+function DP(){const[tab,setTab]=useState("certs");const[search,setSearch]=useState("");const[exp,setExp]=useState(null);const findName=wrc=>{const f=Object.values(DATA.elements).flat().find(w=>String(w.code)===String(wrc));return f?f.name:"WRC "+wrc;};const ce=useMemo(()=>{const out=[];Object.keys(DATA.certIndex).sort().forEach(abbr=>{const info=DATA.certIndex[abbr];const roles=[];Object.entries(DATA.certifications).forEach(([wrc,lvls])=>{Object.entries(lvls).forEach(([level,certs])=>{if(certs.some(c=>c.acronym===abbr))roles.push({wrc,level});});});out.push({abbr,name:info.name,vendor:info.vendor,roles});});return out;},[]);const te=useMemo(()=>{const mp={};Object.entries(DATA.training).forEach(([wrc,lvls])=>{Object.entries(lvls).forEach(([level,courses])=>{if(!courses)return;courses.forEach(c=>{const ky=c.number||c.title;if(!mp[ky])mp[ky]={...c,roles:[]};mp[ky].roles.push({wrc,level});});});});return Object.values(mp).sort((a,b)=>(a.title||"").localeCompare(b.title||""));},[]);const fl=useMemo(()=>{const t=search.toLowerCase();if(tab==="certs")return ce.filter(e=>!t||e.abbr.toLowerCase().includes(t)||e.name.toLowerCase().includes(t)||e.vendor.toLowerCase().includes(t));return te.filter(e=>!t||(e.title||"").toLowerCase().includes(t)||(e.number||"").toLowerCase().includes(t)||(e.desc||"").toLowerCase().includes(t));},[tab,search,ce,te]);return <div style={{padding:"0 16px 24px",maxWidth:1200,margin:"0 auto"}}><div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center",flexWrap:"wrap"}}>{[{k:"certs",l:"Certifications ("+ce.length+")"},{k:"train",l:"Training ("+te.length+")"}].map(t=><button key={t.k} onClick={()=>{setTab(t.k);setSearch("");setExp(null);}} style={{padding:"10px 18px",borderRadius:10,background:tab===t.k?"#1e3050":"#111827",border:"1px solid "+(tab===t.k?"#3b82f6":"#1e293b"),color:tab===t.k?"#e2e8f0":"#64748b",fontSize:13,fontWeight:600,cursor:"pointer"}}>{t.l}</button>)}<input type="text" placeholder="Search..." value={search} onChange={e=>setSearch(e.target.value)} style={{flex:1,minWidth:180,padding:"10px 14px",borderRadius:10,border:"1px solid #1e293b",background:"#0f172a",color:"#e2e8f0",fontSize:13,outline:"none"}}/><span style={{fontSize:12,color:"#64748b"}}>{fl.length} results</span></div><div style={{maxHeight:"calc(100vh - 280px)",overflowY:"auto",borderRadius:12,border:"1px solid #1e293b"}}>{tab==="certs"&&fl.map((e,i)=>{const op=exp===("c-"+e.abbr);return <div key={i} style={{borderBottom:"1px solid #1e293b"}}><div onClick={()=>setExp(op?null:"c-"+e.abbr)} style={{padding:"12px 16px",cursor:"pointer",background:op?"#111827":"#0d1525",display:"flex",alignItems:"center",gap:12}} onMouseEnter={ev=>{if(!op)ev.currentTarget.style.background="#111827"}} onMouseLeave={ev=>{if(!op)ev.currentTarget.style.background="#0d1525"}}><span style={{fontSize:13,fontWeight:700,color:"#3b82f6",minWidth:100}}>{e.abbr}</span><div style={{flex:1}}><div style={{fontSize:13,color:"#e2e8f0",fontWeight:600}}>{e.name}</div><div style={{fontSize:11,color:"#64748b"}}>{e.vendor}</div></div><span style={{fontSize:11,padding:"3px 10px",borderRadius:6,background:"#1e293b",color:"#94a3b8"}}>{e.roles.length}</span></div>{op&&<div style={{padding:"14px 16px",background:"#0a0f1a",borderTop:"1px solid #1e293b"}}><div style={{display:"flex",flexWrap:"wrap",gap:4}}>{e.roles.map((r,j)=><span key={j} style={{fontSize:11,padding:"4px 10px",borderRadius:6,background:"#1e293b",color:"#94a3b8"}}>{r.wrc} - {findName(r.wrc)} ({r.level})</span>)}</div></div>}</div>;})}{tab==="train"&&fl.map((e,i)=>{const ky=e.number||e.title;const op=exp===("t-"+ky);return <div key={i} style={{borderBottom:"1px solid #1e293b"}}><div onClick={()=>setExp(op?null:"t-"+ky)} style={{padding:"12px 16px",cursor:"pointer",background:op?"#111827":"#0d1525",display:"flex",alignItems:"center",gap:12}} onMouseEnter={ev=>{if(!op)ev.currentTarget.style.background="#111827"}} onMouseLeave={ev=>{if(!op)ev.currentTarget.style.background="#0d1525"}}><div style={{flex:1}}><div style={{fontSize:13,color:"#e2e8f0",fontWeight:600}}>{e.title}</div><div style={{fontSize:11,color:"#64748b"}}>{e.number}{e.component&&" | "+e.component}{e.duration&&" | "+e.duration}</div></div>{e.desc&&<span style={{fontSize:10,padding:"3px 8px",borderRadius:6,background:"#10b98120",color:"#10b981"}}>desc</span>}<span style={{fontSize:11,padding:"3px 10px",borderRadius:6,background:"#1e293b",color:"#94a3b8"}}>{e.roles.length}</span></div>{op&&<div style={{padding:"14px 16px",background:"#0a0f1a",borderTop:"1px solid #1e293b"}}>{e.desc&&<div style={{fontSize:12,color:"#b0bec5",lineHeight:1.6,marginBottom:10,whiteSpace:"pre-wrap"}}>{e.desc}</div>}<div style={{display:"flex",flexWrap:"wrap",gap:4}}>{e.roles.map((r,j)=><span key={j} style={{fontSize:11,padding:"4px 10px",borderRadius:6,background:"#1e293b",color:"#94a3b8"}}>{r.wrc} - {findName(r.wrc)} ({r.level})</span>)}</div></div>}</div>;})}</div></div>;}
 
-/* ========== MAIN APP ========== */
+/* ========== MAIN APP WITH BOTTOM NAV ========== */
 export default function App(){
   const[mode,setMode]=useState("single");
   const[selEl,setSelEl]=useState("");
@@ -325,31 +264,114 @@ export default function App(){
   const pick=r=>{if(mode==="single"){setSelEl(r.element);setSelRole(r);setSearch("");}else if(mode==="compare"){const idx=slots.findIndex(s=>!s.role);if(idx>=0){const ns=[...slots];ns[idx]={element:r.element,role:r};setSlots(ns);}setSearch("");}};
   const accent=selEl?getAc(selEl):"#3b82f6";
 
-  return <div style={{fontFamily:"'Segoe UI',-apple-system,sans-serif",background:"#0c1220",color:"#e2e8f0",minHeight:"100vh"}}>
-    <div style={{background:"linear-gradient(135deg,#0f172a 0%,#1a2744 50%,#0f172a 100%)",borderBottom:"1px solid #1e3050",padding:"16px 24px"}}>
-      <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:6}}>
-        <div style={{width:38,height:38,borderRadius:10,background:"linear-gradient(135deg,#3b82f6,#8b5cf6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:900,color:"#fff",flexShrink:0}}>8140</div>
-        <div style={{flex:1}}><h1 style={{margin:0,fontSize:18,fontWeight:800,color:"#f8fafc"}}>DoD 8140 Qualification Matrix & DCWF Tool</h1><div style={{fontSize:11,color:"#64748b",marginTop:1}}>Cyberspace Workforce Qualification, Management & Position Coding - V2.1</div></div>
-        <div style={{display:"flex",background:"#0f172a",borderRadius:8,border:"1px solid #1e3050",overflow:"hidden",flexShrink:0}}>
-          {[{k:"single",l:"Matrix"},{k:"compare",l:"Compare"},{k:"wizard",l:"Position Wizard"},{k:"dict",l:"Dictionary"}].map(m=>
-            <button key={m.k} onClick={()=>{setMode(m.k);setSearch("");}} style={{padding:"8px 12px",background:mode===m.k?"#1e3050":"transparent",border:"none",color:mode===m.k?"#e2e8f0":"#64748b",fontSize:10,fontWeight:600,cursor:"pointer"}}>{m.l}</button>
-          )}
+  return <div style={{fontFamily:"'Segoe UI',-apple-system,sans-serif",background:"#0c1220",color:"#e2e8f0",minHeight:"100vh",paddingBottom:80}}>
+
+    {/* HEADER - compact */}
+    <div style={{background:"linear-gradient(135deg,#0f172a 0%,#1a2744 50%,#0f172a 100%)",borderBottom:"1px solid #1e3050",padding:"14px 16px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:12,maxWidth:1200,margin:"0 auto"}}>
+        <div style={{width:36,height:36,borderRadius:10,background:"linear-gradient(135deg,#3b82f6,#8b5cf6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:900,color:"#fff",flexShrink:0}}>8140</div>
+        <div style={{flex:1}}>
+          <h1 style={{margin:0,fontSize:16,fontWeight:800,color:"#f8fafc"}}>DoD 8140 & DCWF Tool</h1>
+          <div style={{fontSize:10,color:"#64748b",marginTop:1}}>Qualification Matrix | Position Coding | V2.1</div>
         </div>
       </div>
-      {(mode==="single"||mode==="compare")&&<div style={{position:"relative",marginTop:12,maxWidth:600}}>
-        <input type="text" placeholder="Search work roles..." value={search} onChange={e=>setSearch(e.target.value)} style={{width:"100%",padding:"9px 14px",borderRadius:8,border:"1px solid #1e3050",background:"#0f172a",color:"#e2e8f0",fontSize:12,outline:"none",boxSizing:"border-box"}}/>
-        {sRes.length>0&&<div style={{position:"absolute",top:"100%",left:0,right:0,background:"#1a2332",border:"1px solid #1e3050",borderRadius:8,marginTop:4,zIndex:100,maxHeight:350,overflowY:"auto",boxShadow:"0 20px 50px rgba(0,0,0,0.5)"}}>
-          {sRes.map((r,i)=>{const ac=getAc(r.element);return <div key={i} onClick={()=>pick(r)} style={{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid #1e293b"}} onMouseEnter={e=>e.currentTarget.style.background="#0f172a"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}><div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:11,fontWeight:700,color:ac,minWidth:32}}>{r.code}</span><span style={{fontSize:12,color:"#e2e8f0",fontWeight:600}}>{r.name}</span><span style={{marginLeft:"auto",fontSize:10,padding:"2px 8px",borderRadius:4,background:getBd(r.element),color:ac}}>{r.element}</span></div></div>;})}
-        </div>}
-      </div>}
     </div>
 
-    {mode==="single"&&<><div style={{padding:"14px 24px",display:"flex",gap:12,flexWrap:"wrap",alignItems:"flex-end"}}><div style={{flex:1,minWidth:180,maxWidth:260}}><label style={{display:"block",fontSize:10,fontWeight:700,color:"#64748b",textTransform:"uppercase",marginBottom:5}}>Element</label><select value={selEl} onChange={e=>{setSelEl(e.target.value);setSelRole(null);}} style={{width:"100%",padding:"9px 12px",borderRadius:8,border:"1px solid "+accent+"40",background:"#111827",color:"#e2e8f0",fontSize:12,cursor:"pointer"}}><option value="">Select Element...</option>{DATA.elementOrder.map(el=><option key={el} value={el}>{el} ({(DATA.elements[el]||[]).length})</option>)}</select></div>{selEl&&<div style={{flex:2,minWidth:260}}><label style={{display:"block",fontSize:10,fontWeight:700,color:"#64748b",textTransform:"uppercase",marginBottom:5}}>Work Role</label><select value={selRole?selRole.code:""} onChange={e=>{const c=Number(e.target.value);setSelRole(roles.find(r=>r.code===c)||null);}} style={{width:"100%",padding:"9px 12px",borderRadius:8,border:"1px solid "+accent+"40",background:"#111827",color:"#e2e8f0",fontSize:12,cursor:"pointer"}}><option value="">Select Work Role...</option>{roles.map(r=><option key={r.code} value={r.code}>{r.code}-{r.name}</option>)}</select></div>}</div>{selRole&&rd&&<SC role={selRole} element={selEl} accent={accent}/>}{selRole&&rd?<div style={{padding:"0 24px 24px"}}><RC role={selRole} element={selEl} rd={rd} accent={accent} badge={getBd(selEl)}/></div>:<div style={{padding:"50px 24px",textAlign:"center"}}><div style={{fontSize:15,color:"#475569",fontWeight:600}}>Select an Element and Work Role</div><div style={{display:"flex",justifyContent:"center",gap:8,flexWrap:"wrap",marginTop:18}}>{DATA.elementOrder.map(el=><div key={el} onClick={()=>{setSelEl(el);setSelRole(null);}} style={{padding:"7px 14px",borderRadius:8,background:getBd(el),color:getAc(el),fontSize:11,fontWeight:600,cursor:"pointer",border:"1px solid "+getAc(el)+"30"}}>{el} ({(DATA.elements[el]||[]).length})</div>)}</div></div>}</>}
+    {/* SEARCH BAR (Matrix & Compare modes) */}
+    {(mode==="single"||mode==="compare")&&<div style={{padding:"12px 16px",maxWidth:1200,margin:"0 auto"}}>
+      <div style={{position:"relative"}}>
+        <input type="text" placeholder="Search work roles..." value={search} onChange={e=>setSearch(e.target.value)} style={{width:"100%",padding:"12px 16px",borderRadius:12,border:"1px solid #1e3050",background:"#111827",color:"#e2e8f0",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+        {sRes.length>0&&<div style={{position:"absolute",top:"100%",left:0,right:0,background:"#1a2332",border:"1px solid #1e3050",borderRadius:12,marginTop:4,zIndex:100,maxHeight:350,overflowY:"auto",boxShadow:"0 20px 50px rgba(0,0,0,0.6)"}}>
+          {sRes.map((r,i)=>{const ac=getAc(r.element);return <div key={i} onClick={()=>pick(r)} style={{padding:"12px 16px",cursor:"pointer",borderBottom:"1px solid #1e293b"}} onMouseEnter={e=>e.currentTarget.style.background="#0f172a"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}><div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:12,fontWeight:700,color:ac,minWidth:36}}>{r.code}</span><span style={{fontSize:13,color:"#e2e8f0",fontWeight:600}}>{r.name}</span><span style={{marginLeft:"auto",fontSize:10,padding:"3px 10px",borderRadius:6,background:getBd(r.element),color:ac}}>{r.element}</span></div></div>;})}
+        </div>}
+      </div>
+    </div>}
 
-    {mode==="compare"&&<><div style={{padding:"14px 24px",display:"flex",gap:12,flexWrap:"wrap"}}>{slots.map((slot,idx)=>{const sa=slot.element?getAc(slot.element):"#475569";const sr=slot.element?(DATA.elements[slot.element]||[]).sort((a,b)=>a.code-b.code):[];return <div key={idx} style={{flex:1,minWidth:280,padding:"12px 16px",background:"#111827",borderRadius:10,border:"1px solid "+sa+"30"}}><div style={{display:"flex",gap:8}}><select value={slot.element} onChange={e=>{const ns=[...slots];ns[idx]={element:e.target.value,role:null};setSlots(ns);}} style={{flex:1,padding:"7px",borderRadius:6,border:"1px solid #1e293b",background:"#0c1220",color:"#e2e8f0",fontSize:11}}><option value="">Element...</option>{DATA.elementOrder.map(el=><option key={el} value={el}>{el}</option>)}</select><select value={slot.role?slot.role.code:""} onChange={e=>{const c=Number(e.target.value);const r=sr.find(x=>x.code===c);const ns=[...slots];ns[idx]={...ns[idx],role:r||null};setSlots(ns);}} style={{flex:2,padding:"7px",borderRadius:6,border:"1px solid #1e293b",background:"#0c1220",color:"#e2e8f0",fontSize:11}} disabled={!slot.element}><option value="">Work Role...</option>{sr.map(r=><option key={r.code} value={r.code}>{r.code}-{r.name}</option>)}</select>{slot.role&&<button onClick={()=>{const ns=[...slots];ns[idx]={element:"",role:null};setSlots(ns);}} style={{background:"none",border:"1px solid #334155",borderRadius:5,color:"#64748b",cursor:"pointer",padding:"2px 8px",fontSize:10}}>X</button>}</div>{slot.role&&<SC role={slot.role} element={slot.element} accent={sa} compact={true}/>}</div>;})}{slots.length<3&&<button onClick={()=>setSlots([...slots,{element:"",role:null}])} style={{padding:"10px 18px",borderRadius:10,border:"1px dashed #334155",background:"transparent",color:"#475569",fontSize:12,cursor:"pointer",alignSelf:"center"}}>+</button>}</div>{cmpD&&<CS selections={cmpD.sel} diffs={cmpD.df}/>}{cmpD&&<div style={{padding:"0 24px 24px",display:"flex",gap:16,alignItems:"flex-start",overflowX:"auto"}}>{cmpD.sel.map((sel,idx)=><RC key={sel.role.code} role={sel.role} element={sel.element} rd={cmpD.rds[idx]} accent={getAc(sel.element)} badge={getBd(sel.element)} isComp={true} shD={cmpD.df.sh} unD={cmpD.df.un[idx]} onRemove={()=>{const ns=[...slots];const si=ns.findIndex(s=>s.role?.code===sel.role.code);if(si>=0)ns[si]={element:"",role:null};setSlots(ns);}}/>)}</div>}{!cmpD&&<div style={{padding:"40px 24px",textAlign:"center",color:"#475569"}}>Select 2+ Work Roles to Compare</div>}</>}
+    {/* CONTENT AREA */}
+    <div style={{maxWidth:1200,margin:"0 auto"}}>
 
-    {mode==="wizard"&&<><div style={{padding:"16px 24px 8px"}}><div style={{fontSize:14,fontWeight:700,color:"#e2e8f0",marginBottom:4}}>Position Coding Wizard</div><div style={{fontSize:11,color:"#64748b",marginBottom:12}}>Search by task, KSA, or duty statement to find the correct DCWF work role(s). Based on DoDI 8140.02 guidance: code by work performed, not title. Assign one Primary + up to two Additional roles.</div></div><Wizard/></>}
+    {mode==="single"&&<>
+      <div style={{padding:"8px 16px",display:"flex",gap:10,flexWrap:"wrap",alignItems:"flex-end"}}>
+        <div style={{flex:1,minWidth:160,maxWidth:280}}>
+          <label style={{display:"block",fontSize:11,fontWeight:700,color:"#64748b",textTransform:"uppercase",marginBottom:5}}>Element</label>
+          <select value={selEl} onChange={e=>{setSelEl(e.target.value);setSelRole(null);}} style={{width:"100%",padding:"10px 14px",borderRadius:10,border:"1px solid "+accent+"40",background:"#111827",color:"#e2e8f0",fontSize:13,cursor:"pointer"}}>
+            <option value="">Select Element...</option>
+            {DATA.elementOrder.map(el=><option key={el} value={el}>{el} ({(DATA.elements[el]||[]).length})</option>)}
+          </select>
+        </div>
+        {selEl&&<div style={{flex:2,minWidth:220}}>
+          <label style={{display:"block",fontSize:11,fontWeight:700,color:"#64748b",textTransform:"uppercase",marginBottom:5}}>Work Role</label>
+          <select value={selRole?selRole.code:""} onChange={e=>{const c=Number(e.target.value);setSelRole(roles.find(r=>r.code===c)||null);}} style={{width:"100%",padding:"10px 14px",borderRadius:10,border:"1px solid "+accent+"40",background:"#111827",color:"#e2e8f0",fontSize:13,cursor:"pointer"}}>
+            <option value="">Select Work Role...</option>
+            {roles.map(r=><option key={r.code} value={r.code}>{r.code}-{r.name}</option>)}
+          </select>
+        </div>}
+      </div>
+      {selRole&&rd&&<SC role={selRole} element={selEl} accent={accent}/>}
+      {selRole&&rd?<div style={{padding:"0 16px 24px"}}><RC role={selRole} element={selEl} rd={rd} accent={accent} badge={getBd(selEl)}/></div>
+      :<div style={{padding:"50px 16px",textAlign:"center"}}>
+        <div style={{fontSize:16,color:"#475569",fontWeight:600,marginBottom:12}}>Select an Element and Work Role</div>
+        <div style={{display:"flex",justifyContent:"center",gap:8,flexWrap:"wrap"}}>{DATA.elementOrder.map(el=><div key={el} onClick={()=>{setSelEl(el);setSelRole(null);}} style={{padding:"10px 16px",borderRadius:10,background:getBd(el),color:getAc(el),fontSize:12,fontWeight:600,cursor:"pointer",border:"1px solid "+getAc(el)+"30",transition:"transform 0.15s"}} onMouseEnter={e=>e.currentTarget.style.transform="translateY(-2px)"} onMouseLeave={e=>e.currentTarget.style.transform="none"}>{el} ({(DATA.elements[el]||[]).length})</div>)}</div>
+      </div>}
+    </>}
 
-    {mode==="dict"&&<><div style={{padding:"16px 24px 8px"}}><div style={{fontSize:14,fontWeight:700,color:"#e2e8f0",marginBottom:4}}>Reference Dictionary</div><div style={{fontSize:11,color:"#64748b",marginBottom:12}}>Browse all certifications and training courses with full details.</div></div><DP/></>}
+    {mode==="compare"&&<>
+      <div style={{padding:"8px 16px",display:"flex",gap:10,flexWrap:"wrap"}}>
+        {slots.map((slot,idx)=>{const sa=slot.element?getAc(slot.element):"#475569";const sr=slot.element?(DATA.elements[slot.element]||[]).sort((a,b)=>a.code-b.code):[];return <div key={idx} style={{flex:1,minWidth:260,padding:"14px",background:"#111827",borderRadius:12,border:"1px solid "+sa+"30"}}>
+          <div style={{display:"flex",gap:8,marginBottom:slot.role?8:0}}>
+            <select value={slot.element} onChange={e=>{const ns=[...slots];ns[idx]={element:e.target.value,role:null};setSlots(ns);}} style={{flex:1,padding:"8px 10px",borderRadius:8,border:"1px solid #1e293b",background:"#0c1220",color:"#e2e8f0",fontSize:12}}><option value="">Element...</option>{DATA.elementOrder.map(el=><option key={el} value={el}>{el}</option>)}</select>
+            <select value={slot.role?slot.role.code:""} onChange={e=>{const c=Number(e.target.value);const r=sr.find(x=>x.code===c);const ns=[...slots];ns[idx]={...ns[idx],role:r||null};setSlots(ns);}} style={{flex:2,padding:"8px 10px",borderRadius:8,border:"1px solid #1e293b",background:"#0c1220",color:"#e2e8f0",fontSize:12}} disabled={!slot.element}><option value="">Work Role...</option>{sr.map(r=><option key={r.code} value={r.code}>{r.code}-{r.name}</option>)}</select>
+            {slot.role&&<button onClick={()=>{const ns=[...slots];ns[idx]={element:"",role:null};setSlots(ns);}} style={{background:"none",border:"1px solid #334155",borderRadius:8,color:"#64748b",cursor:"pointer",padding:"4px 10px",fontSize:11}}>X</button>}
+          </div>
+          {slot.role&&<SC role={slot.role} element={slot.element} accent={sa} compact={true}/>}
+        </div>;})}{slots.length<3&&<button onClick={()=>setSlots([...slots,{element:"",role:null}])} style={{padding:"14px 24px",borderRadius:12,border:"1px dashed #334155",background:"transparent",color:"#475569",fontSize:13,cursor:"pointer",alignSelf:"center"}}>+ Add</button>}
+      </div>
+      {cmpD&&<CS selections={cmpD.sel} diffs={cmpD.df}/>}
+      {cmpD&&<div style={{padding:"0 16px 24px",display:"flex",gap:16,alignItems:"flex-start",overflowX:"auto"}}>{cmpD.sel.map((sel,idx)=><RC key={sel.role.code} role={sel.role} element={sel.element} rd={cmpD.rds[idx]} accent={getAc(sel.element)} badge={getBd(sel.element)} isComp={true} shD={cmpD.df.sh} unD={cmpD.df.un[idx]} onRemove={()=>{const ns=[...slots];const si=ns.findIndex(s=>s.role?.code===sel.role.code);if(si>=0)ns[si]={element:"",role:null};setSlots(ns);}}/>)}</div>}
+      {!cmpD&&<div style={{padding:"50px 16px",textAlign:"center",color:"#475569",fontSize:14}}>Select 2+ Work Roles to Compare</div>}
+    </>}
+
+    {mode==="wizard"&&<Wizard onCompare={(sessionRoles)=>{
+      const newSlots = sessionRoles.map(s => {
+        const el = Object.entries(DATA.elements).find(([k,v])=>v.some(wr=>String(wr.code)===s.code));
+        const elName = el ? el[0] : s.element;
+        const role = el ? el[1].find(wr=>String(wr.code)===s.code) : null;
+        return { element: elName, role: role || { code: Number(s.code), name: s.name, opr: s.opr } };
+      });
+      setSlots(newSlots.length >= 2 ? newSlots : [...newSlots, {element:"",role:null}]);
+      if (newSlots.length === 1) { setSelEl(newSlots[0].element); setSelRole(newSlots[0].role); setMode("single"); }
+      else { setMode("compare"); }
+    }}/>}
+
+    {mode==="dict"&&<>
+      <div style={{padding:"16px 16px 8px"}}><div style={{fontSize:16,fontWeight:700,color:"#e2e8f0",marginBottom:4}}>Reference Dictionary</div><div style={{fontSize:12,color:"#64748b",marginBottom:12}}>Browse all certifications and training courses. Tap any entry for details.</div></div>
+      <DP/>
+    </>}
+
+    </div>
+
+    {/* BOTTOM NAVIGATION BAR */}
+    <nav style={{position:"fixed",bottom:0,left:0,right:0,background:"linear-gradient(180deg, #0f172aee 0%, #0f172a 100%)",backdropFilter:"blur(12px)",borderTop:"1px solid #1e3050",zIndex:200,padding:"0 8px env(safe-area-inset-bottom)"}}>
+      <div style={{display:"flex",maxWidth:600,margin:"0 auto"}}>
+        {NAV.map(n => {
+          const active = mode === n.k;
+          return <button key={n.k} onClick={()=>{setMode(n.k);setSearch("");}}
+            style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 4px 12px",background:"none",border:"none",cursor:"pointer",position:"relative",transition:"all 0.2s"}}>
+            {active && <div style={{position:"absolute",top:0,left:"20%",right:"20%",height:3,borderRadius:"0 0 3px 3px",background:"linear-gradient(90deg,#3b82f6,#8b5cf6)"}}/>}
+            <NavIcon d={n.icon} size={22} color={active?"#3b82f6":"#475569"}/>
+            <span style={{fontSize:10,fontWeight:active?700:500,color:active?"#e2e8f0":"#64748b",letterSpacing:"0.3px"}}>{n.label}</span>
+          </button>;
+        })}
+      </div>
+    </nav>
+
+    {/* Global responsive styles */}
+    <style>{`
+      * { -webkit-tap-highlight-color: transparent; }
+      select { -webkit-appearance: none; appearance: none; }
+      @media(max-width:640px) {
+        h1 { font-size: 15px !important; }
+      }
+    `}</style>
   </div>;
 }
